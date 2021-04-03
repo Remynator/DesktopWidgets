@@ -1,22 +1,22 @@
 import os
 import time
+import geocoder
+import requests
+import json
 from configparser import ConfigParser
 from datetime import datetime
 from tkinter import *
 from tkinter.font import Font
-
-import geocoder
-import requests
 from PIL import ImageTk
 
 
-# pyinstaller --onefile -w --icon="Images\Clock_256.ico" Clock_onScreen.py  # create executable
+# pyinstaller --onefile -w --icon="Images\Clock_256.ico" ClockWeather_onScreen.py  # create executable
 # https://weather.com/weather/today/l/51.52,5.40?par=google&temp=c
 
 
 class WeatherObject:
 
-    def __init__(self, dt, temp, feels_like, icon, description):
+    def __init__(self, dt, temp, feels_like, icon, description, rain, snow):
         self.dt = dt
         self.date = self.convert_date()
         self.time = self.convert_time()
@@ -25,12 +25,14 @@ class WeatherObject:
         self.feels_like = feels_like - 273.15
         self.icon = ImageTk.PhotoImage(file="../Images/{}.png".format(icon))
         self.description = description
+        self.rain = "rain {:.3f} mm".format(rain) if rain is not None else None
+        self.snow = "snow {:.3f} mm".format(snow) if snow is not None else None
         self.frame = self.create_frame()
 
     def convert_date(self):
         date_time = datetime.fromtimestamp(self.dt)
 
-        return date_time.strftime("%x")
+        return date_time.strftime("%d/%m/%Y")
 
     def convert_time(self):
         date_time = datetime.fromtimestamp(self.dt)
@@ -40,18 +42,27 @@ class WeatherObject:
     def create_frame(self):
         frame = Frame(weather_frame, bg=bg_color)
 
+        if "rain" in self.description:
+            rain_text = self.rain
+        elif "snow" in self.description:
+            rain_text = self.snow
+        else:
+            rain_text = ""
+
         date_label = Label(frame, text=self.date, fg=font_color, bg=bg_color)
         time_label = Label(frame, text=self.time, fg=font_color, bg=bg_color)
         icon_label = Label(frame, image=self.icon, bg=bg_color)
+        desc_label = Label(frame, text=self.description, fg=font_color, bg=bg_color)
         temp_label = Label(frame, text="{:.2f}°C/{:.2f}°C".format(self.temp_celsius, self.feels_like),
                            fg=font_color, bg=bg_color)
-        desc_label = Label(frame, text=self.description, fg=font_color, bg=bg_color)
+        rain_label = Label(frame, text=rain_text, fg=font_color, bg=bg_color)
 
         date_label.pack()
         time_label.pack()
         icon_label.pack()
-        temp_label.pack()
         desc_label.pack()
+        temp_label.pack()
+        rain_label.pack()
 
         return frame
 
@@ -177,14 +188,11 @@ def set_weather(event):
     weather_active = not weather_active
 
     if weather_active:
-        location_label.config(text="{}, {}, {}".format(home_city, lat, lon), fg=font_color, bg=bg_color,
-                              font=Font(family="helvetica", size=14))
-        location_label.pack(pady=15)
-        weather_frame.pack()
+        root.title("Weather {}, {}, {}".format(home_city, lat, lon))
+        weather_frame.pack(pady=20)
         root.geometry("%dx%d" % (weather_x, weather_y))
         update_weather()
     else:
-        location_label.forget()
         weather_frame.forget()
         root.geometry("%dx%d" % (clock_size_x, clock_size_y))
 
@@ -206,22 +214,43 @@ def update_weather():
     if api:
         api = api.json()
 
+        with open('api_data.json', 'w') as outfile:
+            json.dump(api, outfile, indent=2)
+
         for i in range(49):
             if i == 0:
+                try:
+                    rain = api["current"]["rain"]["1h"]
+                except KeyError:
+                    rain = None
+                try:
+                    snow = api["current"]["snow"]["1h"]
+                except KeyError:
+                    snow = None
+
                 weather = WeatherObject(api["current"]["dt"],
                                         api["current"]["temp"],
                                         api["current"]["feels_like"],
                                         api["current"]["weather"][0]["icon"],
-                                        api["current"]["weather"][0]["description"])
-
+                                        api["current"]["weather"][0]["description"],
+                                        rain, snow)
                 weather_info.append(weather)
             else:
+                try:
+                    rain = api["hourly"][i - 1]["rain"]["1h"]
+                except KeyError:
+                    rain = None
+                try:
+                    snow = api["hourly"][i - 1]["snow"]["1h"]
+                except KeyError:
+                    snow = None
+
                 weather = WeatherObject(api["hourly"][i - 1]["dt"],
                                         api["hourly"][i - 1]["temp"],
                                         api["hourly"][i - 1]["feels_like"],
                                         api["hourly"][i - 1]["weather"][0]["icon"],
-                                        api["hourly"][i - 1]["weather"][0]["description"])
-
+                                        api["hourly"][i - 1]["weather"][0]["description"],
+                                        rain, snow)
                 weather_info.append(weather)
 
         root.geometry('%dx%d' % (weather_x, weather_y))
@@ -242,7 +271,11 @@ config = ConfigParser()
 config.read(config_file)
 api_key = config["api_key"]["key"]
 
-home_city, lat, lon = geocoder.ip("me").city, geocoder.ip("me").lat, geocoder.ip("me").lng
+try:
+    home_city, lat, lon = geocoder.ip("me").city, geocoder.ip("me").lat, geocoder.ip("me").lng
+except json.decoder.JSONDecodeError as loc_err:
+    home_city, lat, lon = "London", 0, 0
+
 url = "https://api.openweathermap.org/data/2.5/onecall?lat={}&lon={}&exclude={}&appid={}"
 
 clock_date = Label(root)
@@ -251,7 +284,6 @@ clock_time = Label(root)
 clock_time.pack()
 
 img = ""
-location_label = Label(root)
 weather_info = []
 weather_frame = Frame(root)
 
@@ -262,7 +294,7 @@ font = Font(family="helvetica", size=font_size)
 
 bg_color = "#000000"
 bg_trans = False
-alpha = .5
+alpha = 1
 
 clock_run = False
 clock_size_x = 8 * font_size + 32  # 740
