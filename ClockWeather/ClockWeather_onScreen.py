@@ -14,7 +14,6 @@ from PIL import ImageTk
 # https://weather.com/weather/today/l/51.52,5.40?par=google&temp=c
 
 
-
 class WeatherObject:
 
     def __init__(self, dt, temp, feels_like, icon, description):
