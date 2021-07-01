@@ -4,6 +4,7 @@ import geocoder
 import json
 from datetime import datetime
 from tkinter import *
+from tkinter import colorchooser
 from tkinter.font import Font
 from PIL import ImageTk
 
@@ -13,16 +14,17 @@ clock_date.pack()
 clock_time = Label(root)
 clock_time.pack()
 weather_frame = Frame(root)
+set_pop = 0
 
 img, weather_info, exclude = "", [], ""
 
 start_time = time.time()
-font_size, font_color = 32, "#000000"
-font = Font(family="helvetica", size=font_size)
+font_type, font_size, font_color = "helvetica", 32, "#000000"
+font = Font(family=font_type, size=font_size)
 
 bg_color, bg_trans, alpha = "#000000", False, 1
 
-clock_run, weather_active = False, False
+clock_run, weather_active, settings_active = False, False, False
 clock_size_x, clock_size_y, weather_x, weather_y = 0, 0, 0, 0
 
 home_city, lat, lon = "", 0, 0
@@ -135,10 +137,51 @@ def reposition(event):
     root.geometry('%dx%d+%d+%d' % (root.winfo_width(), root.winfo_height(), x, y))
 
 
+def pick_fc():
+    global font_color
+    font_color = colorchooser.askcolor()[1]
+    update_exp()
+
+
+def update_exp():
+    Label(set_pop, text="example text", bg=bg_color, fg=font_color, font=font).grid(row=3, column=2)
+
+
+def settings(event):
+    global settings_active, set_pop
+    global font_type, font_size, font_color
+
+    settings_active = not settings_active
+
+    if set_pop == 0:
+        set_pop = Toplevel(bg=bg_color)
+        set_pop.title("Settings")
+        set_pop.geometry("%dx%d" % (weather_x, weather_y))
+
+        set_pop.bind("<Control-Key-s>", settings)
+
+        # font_type
+        # font_size
+        Button(set_pop, text="font color", command=pick_fc).grid(row=1, column=2)
+        #
+        # bg_color_label
+        # bg_trans_label
+        # alpha_label
+
+    else:
+        if settings_active:
+            set_pop.deiconify()
+
+        else:
+            set_pop.withdraw()
+            clock_date.config(fg=font_color)
+            clock_time.config(fg=font_color)
+
+
 def init():
     global img, weather_info, exclude
     global start_time
-    global font_size, font_color, font
+    global font_type, font_size, font_color, font
     global bg_color, bg_trans, alpha
     global clock_run, weather_active
     global clock_size_x, clock_size_y, weather_x, weather_y
@@ -161,9 +204,8 @@ def init():
     weather_info = []
 
     start_time = time.time()
-    font_size = 32
-    font_color = "#00ffff"
-    font = Font(family="helvetica", size=font_size)
+    font_type, font_size, font_color = "helvetica", 32, "#00ffff"
+    font = Font(family=font_type, size=font_size)
 
     bg_color = "#000000"
     bg_trans = False

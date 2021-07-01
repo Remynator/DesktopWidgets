@@ -6,7 +6,7 @@ from datetime import datetime
 import Config.Config as cfg
 
 
-# pyinstaller --onefile -w --icon="Images\Clock_256.ico" ClockWeather_onScreen.py  # create executable
+# pyinstaller --onefile --windowed --icon="Images\Clock_256.ico" ClockWeather_onScreen.py  # create executable
 # https://weather.com/weather/today/l/51.52,5.40?par=google&temp=c
 
 
@@ -29,6 +29,8 @@ def run_clock(event):
             cfg.start_time = time.time()
             print("Weather update")
             update_weather()
+        elif cfg.weather_active:
+            cfg.root.geometry("%dx%d" % (cfg.weather_x, cfg.weather_y))
         else:
             cfg.root.geometry('%dx%d' % (cfg.clock_size_x, cfg.clock_size_y))
 
@@ -56,6 +58,7 @@ def open_clock():
     cfg.root.bind("<Key-D>", cfg.reposition)
     cfg.root.bind("<space>", run_clock)
     cfg.root.bind("<Control-Key-w>", set_weather)
+    cfg.root.bind("<Control-Key-s>", cfg.settings)
 
     update_clock()
 
@@ -101,8 +104,8 @@ def update_weather():
     if api:
         api = api.json()
 
-        with open('api_data.json', 'w') as outfile:
-            json.dump(api, outfile, indent=2)
+        # with open('api_data.json', 'w') as outfile:
+        #     json.dump(api, outfile, indent=2)
 
         for i in range(49):
             if i == 0:
